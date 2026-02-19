@@ -11,7 +11,12 @@
       "Bash(wsl.exe --list --verbose:*)",
       "Bash(curl:*)",
       "Bash(iconv:*)",
-      "mcp__ide__executeCode"
+      "mcp__ide__executeCode",
+      "Bash(git -C /home/dogmnil2007/develop/mp3 status)",
+      "Bash(git -C /home/dogmnil2007/develop/mp3 log --oneline -3)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git -C /home/dogmnil2007/develop/mp3 add CLAUDE.md)"
     ]
   }
 }

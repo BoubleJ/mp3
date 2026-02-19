@@ -1,6 +1,5 @@
 """
-melon_tagger/mp3_handler.py
-mutagen 기반 MP3 메타데이터 읽기/쓰기
+mutagen 기반 MP3 메타데이터 읽기/쓰기 (서비스 레이어)
 """
 
 from pathlib import Path
@@ -10,20 +9,16 @@ from mutagen.mp3 import MP3
 from mutagen.id3 import (
     ID3,
     ID3NoHeaderError,
-    TIT2,  # 제목
-    TPE1,  # 아티스트
-    TALB,  # 앨범
-    TPE2,  # 앨범아티스트
-    TCON,  # 장르
-    TRCK,  # 트랙번호
-    APIC,  # 앨범아트
-    USLT,  # 가사 (Unsynchronized Lyrics)
-    TPOS,  # 디스크번호
-    TYER,  # 연도
-    ID3TimeStamp,
-    TDRC,
+    TIT2,
+    TPE1,
+    TALB,
+    TPE2,
+    TCON,
+    TRCK,
+    APIC,
+    USLT,
+    TPOS,
 )
-
 
 class MP3Handler:
     def read_metadata(self, filepath: str) -> dict:
@@ -67,7 +62,6 @@ class MP3Handler:
         try:
             tags = ID3(filepath)
         except ID3NoHeaderError:
-            # ID3 헤더가 없는 경우 새로 생성
             audio = MP3(filepath)
             audio.add_tags()
             tags = audio.tags
@@ -87,17 +81,15 @@ class MP3Handler:
         if disc_number:
             tags["TPOS"] = TPOS(encoding=3, text=str(disc_number))
 
-        # 앨범아트
         if cover_data:
             tags["APIC"] = APIC(
                 encoding=3,
                 mime="image/jpeg",
-                type=3,  # Front cover
+                type=3,
                 desc="Cover",
                 data=cover_data,
             )
 
-        # 가사 (USLT - Unsynchronized Lyrics, 삼성뮤직 호환)
         if lyrics:
             tags["USLT::kor"] = USLT(encoding=3, lang="kor", desc="", text=lyrics)
 
@@ -108,12 +100,7 @@ class MP3Handler:
         mp3_filepath: str,
         synced_lyrics: List[Tuple[str, int]],
     ) -> str:
-        """
-        싱크 가사를 MP3 파일과 동일한 이름의 .lrc 파일로 저장한다.
-        삼성뮤직은 SYLT ID3 태그 대신 사이드카 .lrc 파일을 읽는다.
-
-        반환: 생성된 .lrc 파일 경로
-        """
+        """싱크 가사를 MP3와 동일한 이름의 .lrc 파일로 저장. 반환: 생성된 .lrc 경로"""
         lrc_path = Path(mp3_filepath).with_suffix(".lrc")
         lines = []
         for text, ms in synced_lyrics:

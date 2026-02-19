@@ -4,7 +4,7 @@
 
 ### 커밋
 - **모든 작업 완료 후 반드시 git commit을 수행한다.**
-- 커밋 대상: 작업에서 수정한 소스 파일만 (`melon_tagger/`, `main.py`, `setup_desktop.py` 등)
+- 커밋 대상: 작업에서 수정한 소스 파일만 (`src/`, `main.py`, `setup_desktop.py` 등)
 - 커밋 제외: `.claude/`, `__pycache__/`, `.pyc` 파일
 - 커밋 메시지 형식:
   ```
@@ -23,8 +23,9 @@
 ### 핵심 파일
 | 파일 | 역할 |
 |------|------|
-| `melon_tagger/crawler.py` | 멜론 크롤러 (앨범, 곡 상세, 가사, 싱크가사) |
-| `melon_tagger/mp3_handler.py` | mutagen 기반 ID3 태그 읽기/쓰기 |
-| `melon_tagger/ui.py` | tkinter + ttk 다크 테마 GUI |
+| `src/models/` | 도메인 데이터 (AlbumInfo, TrackInfo) |
+| `src/api/melon_crawler.py` | 멜론 크롤러 (앨범, 곡 상세, 가사, 싱크가사) |
+| `src/services/mp3_handler.py` | mutagen 기반 ID3 태그 읽기/쓰기 |
+| `src/ui/` | tkinter + ttk 다크 테마 GUI (theme, widgets, main_window) |
 | `main.py` | 진입점 |
 | `setup_desktop.py` | Windows 바탕화면 단축아이콘 설치 |
