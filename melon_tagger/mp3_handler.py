@@ -4,7 +4,7 @@ mutagen 기반 MP3 메타데이터 읽기/쓰기
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from mutagen.mp3 import MP3
 from mutagen.id3 import (
@@ -17,6 +17,9 @@ from mutagen.id3 import (
     TCON,  # 장르
     TRCK,  # 트랙번호
     APIC,  # 앨범아트
+    USLT,  # 가사 (Unsynchronized Lyrics)
+    SYLT,  # 싱크 가사 (Synchronized Lyrics)
+    TPOS,  # 디스크번호
     TYER,  # 연도
     ID3TimeStamp,
     TDRC,
@@ -58,6 +61,9 @@ class MP3Handler:
         genre: str = "",
         track_number: int = 0,
         cover_data: Optional[bytes] = None,
+        lyrics: str = "",
+        synced_lyrics: Optional[List[Tuple[str, int]]] = None,
+        disc_number: int = 0,
     ) -> None:
         """MP3 파일에 메타데이터를 기록"""
         try:
@@ -80,6 +86,8 @@ class MP3Handler:
             tags["TCON"] = TCON(encoding=3, text=genre)
         if track_number:
             tags["TRCK"] = TRCK(encoding=3, text=str(track_number))
+        if disc_number:
+            tags["TPOS"] = TPOS(encoding=3, text=str(disc_number))
 
         # 앨범아트
         if cover_data:
@@ -89,6 +97,21 @@ class MP3Handler:
                 type=3,  # Front cover
                 desc="Cover",
                 data=cover_data,
+            )
+
+        # 가사 (USLT - Unsynchronized Lyrics, 삼성뮤직 호환)
+        if lyrics:
+            tags["USLT::kor"] = USLT(encoding=3, lang="kor", desc="", text=lyrics)
+
+        # 싱크 가사 (SYLT - Synchronized Lyrics, 삼성뮤직 호환)
+        if synced_lyrics:
+            tags["SYLT::kor"] = SYLT(
+                encoding=3,
+                lang="kor",
+                format=2,   # 2 = 절대 시간 (밀리초)
+                type=1,     # 1 = lyrics
+                desc="",
+                text=synced_lyrics,
             )
 
         tags.save(filepath, v2_version=3)

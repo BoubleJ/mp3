@@ -1273,6 +1273,8 @@ class SingleFileTab(ttk.Frame):
         self._mp3_path: Optional[str] = None
         self._album: Optional[AlbumInfo] = None
         self._matched_track: Optional[TrackInfo] = None
+        self._lyrics: str = ""
+        self._synced_lyrics: list = []
         self._photo_ref = None
         self._build()
         self._setup_drag_drop()
@@ -1298,7 +1300,6 @@ class SingleFileTab(ttk.Frame):
             url_row, textvariable=self._url_var, font=Theme.FONT_MONO,
         )
         self._url_entry.pack(side="left", fill="x", expand=True, padx=(0, 0))
-        self._url_entry.insert(0, "https://www.melon.com/album/detail.htm?albumId=...")
         self._url_entry.bind("<Return>", lambda e: self._do_crawl())
 
         # 찾을 노래 행
@@ -1391,7 +1392,7 @@ class SingleFileTab(ttk.Frame):
         ).pack(anchor="w", padx=12, pady=(10, 8))
 
         preview_body = ttk.Frame(preview_card, style="Card.TFrame")
-        preview_body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        preview_body.pack(fill="x", padx=12, pady=(0, 8))
 
         # 앨범아트
         art_wrapper = tk.Frame(
@@ -1420,6 +1421,7 @@ class SingleFileTab(ttk.Frame):
             ("장르",        "genre"),
             ("발매일",      "release_date"),
             ("트랙번호",    "track_number"),
+            ("디스크번호",  "disc_number"),
         ]
         self._meta_vars: Dict[str, tk.StringVar] = {}
 
@@ -1441,6 +1443,52 @@ class SingleFileTab(ttk.Frame):
                 wraplength=340, justify="left", anchor="w",
             ).pack(side="left", fill="x", expand=True)
 
+        # ── 가사 영역 ──────────────────────────
+        ttk.Separator(preview_card, orient="horizontal").pack(fill="x", padx=12, pady=(4, 0))
+
+        lyrics_header = ttk.Frame(preview_card, style="Card.TFrame")
+        lyrics_header.pack(fill="x", padx=12, pady=(6, 4))
+
+        ttk.Label(
+            lyrics_header, text="가사",
+            style="Accent.TLabel",
+        ).pack(side="left")
+
+        self._lyrics_status_var = tk.StringVar(value="")
+        ttk.Label(
+            lyrics_header, textvariable=self._lyrics_status_var,
+            style="Sub.TLabel",
+        ).pack(side="left", padx=(8, 0))
+
+        self._sync_status_var = tk.StringVar(value="")
+        ttk.Label(
+            lyrics_header, textvariable=self._sync_status_var,
+            style="Accent.TLabel",
+        ).pack(side="left", padx=(12, 0))
+
+        lyrics_frame = ttk.Frame(preview_card, style="Card.TFrame")
+        lyrics_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        self._lyrics_text = tk.Text(
+            lyrics_frame,
+            bg=T.ENTRY_BG,
+            fg=T.TEXT,
+            insertbackground=T.TEXT,
+            selectbackground=T.SELECT_BG,
+            selectforeground=T.SELECT_FG,
+            font=T.FONT_KR_SM,
+            relief="flat",
+            wrap="word",
+            state="disabled",
+            height=6,
+        )
+        lyrics_vsb = ttk.Scrollbar(
+            lyrics_frame, orient="vertical", command=self._lyrics_text.yview,
+        )
+        self._lyrics_text.configure(yscrollcommand=lyrics_vsb.set)
+        self._lyrics_text.pack(side="left", fill="both", expand=True)
+        lyrics_vsb.pack(side="right", fill="y")
+
         # ── 하단: 적용 버튼 바 ─────────────────
         apply_bar = ttk.Frame(self, style="Card.TFrame", padding=(10, 6))
         apply_bar.pack(side="bottom", fill="x", padx=8, pady=(0, 4))
@@ -1460,7 +1508,7 @@ class SingleFileTab(ttk.Frame):
         opts_frame = ttk.Frame(btn_row, style="Card.TFrame")
         opts_frame.pack(side="right")
 
-        self._backup_var = tk.BooleanVar(value=True)
+        self._backup_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             opts_frame, text="원본 백업",
             variable=self._backup_var,
@@ -1523,7 +1571,7 @@ class SingleFileTab(ttk.Frame):
         url = self._url_var.get().strip()
         search = self._search_var.get().strip()
 
-        if not url or "albumId=..." in url:
+        if not url:
             messagebox.showwarning("URL 필요", "멜론 앨범 URL을 입력해 주세요.")
             return
         if not search:
@@ -1574,6 +1622,19 @@ class SingleFileTab(ttk.Frame):
         self._status_bar.set_status(f"'{track.title}' 매칭 완료", "success")
         self._status_bar.set_progress(100)
 
+        # 가사 비동기 로딩 시작 (일반 + 싱크)
+        if track.song_id:
+            self._lyrics_status_var.set("가사 로딩 중...")
+            self._sync_status_var.set("")
+            threading.Thread(
+                target=self._fetch_lyrics_worker,
+                args=(track.song_id, track.title, track.artist, track.album),
+                daemon=True,
+            ).start()
+        else:
+            self._lyrics_status_var.set("가사 정보 없음")
+            self._sync_status_var.set("")
+
     def _on_crawl_error(self, msg: str):
         self._crawl_btn.configure(state="normal")
         self._status_bar.set_status(f"크롤링 실패: {msg}", "error")
@@ -1582,6 +1643,31 @@ class SingleFileTab(ttk.Frame):
             "크롤링 오류",
             f"앨범 정보를 가져오는 중 오류가 발생했습니다.\n\n{msg}",
         )
+
+    # ── 가사 로딩 ────────────────────────────
+    def _fetch_lyrics_worker(self, song_id: str, title: str, artist: str, album: str):
+        crawler = MelonCrawler()
+        lyrics = crawler.crawl_lyrics(song_id)
+        synced = crawler.fetch_synced_lyrics(title, artist, album)
+        self.after(0, self._on_lyrics_done, lyrics, synced)
+
+    def _on_lyrics_done(self, lyrics: str, synced: list):
+        self._lyrics = lyrics
+        self._synced_lyrics = synced
+        self._lyrics_text.configure(state="normal")
+        self._lyrics_text.delete("1.0", "end")
+        if lyrics:
+            self._lyrics_text.insert("1.0", lyrics)
+            self._lyrics_status_var.set("가사 로드됨")
+        else:
+            self._lyrics_text.insert("1.0", "(가사 없음)")
+            self._lyrics_status_var.set("가사 없음")
+        self._lyrics_text.configure(state="disabled")
+
+        if synced:
+            self._sync_status_var.set(f"싱크 가사 있음 ({len(synced)}줄)")
+        else:
+            self._sync_status_var.set("싱크 가사 없음")
 
     def _find_track(self, album: AlbumInfo, search: str) -> Optional[TrackInfo]:
         """검색어와 가장 잘 일치하는 트랙 반환 (정확→정규화→부분 포함 순)"""
@@ -1615,6 +1701,7 @@ class SingleFileTab(ttk.Frame):
         self._meta_vars["genre"].set(track.genre or "—")
         self._meta_vars["release_date"].set(album.release_date or "—")
         self._meta_vars["track_number"].set(str(track.track_number))
+        self._meta_vars["disc_number"].set(str(track.disc_number))
 
         if album.cover_data and PIL_AVAILABLE:
             img = Image.open(BytesIO(album.cover_data))
@@ -1630,6 +1717,13 @@ class SingleFileTab(ttk.Frame):
         self._art_label.config(text="앨범아트\n없음", image="")
         self._photo_ref = None
         self._matched_track = None
+        self._lyrics = ""
+        self._synced_lyrics = []
+        self._lyrics_status_var.set("")
+        self._sync_status_var.set("")
+        self._lyrics_text.configure(state="normal")
+        self._lyrics_text.delete("1.0", "end")
+        self._lyrics_text.configure(state="disabled")
 
     # ── 적용 ──────────────────────────────────
     @staticmethod
@@ -1662,7 +1756,10 @@ class SingleFileTab(ttk.Frame):
                 album_artist=track.album_artist,
                 genre=track.genre,
                 track_number=track.track_number,
+                disc_number=track.disc_number,
                 cover_data=self._album.cover_data if self._cover_var.get() else None,
+                lyrics=self._lyrics,
+                synced_lyrics=self._synced_lyrics if self._synced_lyrics else None,
             )
 
             # ── 파일명 변경: 가수명-트랙번호-노래제목.mp3 ──
