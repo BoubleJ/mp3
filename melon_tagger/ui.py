@@ -1768,7 +1768,6 @@ class SingleFileTab(ttk.Frame):
                 disc_number=track.disc_number,
                 cover_data=self._album.cover_data if self._cover_var.get() else None,
                 lyrics=self._lyrics,
-                synced_lyrics=self._synced_lyrics if self._synced_lyrics else None,
             )
 
             # ── 파일명 변경: 가수명-트랙번호-노래제목.mp3 ──
@@ -1790,17 +1789,25 @@ class SingleFileTab(ttk.Frame):
             old_path.rename(new_path)
             self._mp3_path = str(new_path)
 
+            # ── .lrc 사이드카 파일 생성 (삼성뮤직 싱크 가사) ──
+            # 파일명 변경 이후에 생성해야 MP3와 이름이 일치함
+            lrc_created = False
+            if self._synced_lyrics:
+                handler.write_lrc_file(str(new_path), self._synced_lyrics)
+                lrc_created = True
+
             # UI 표시 갱신
             display = new_name[:28] + "…" if len(new_name) > 28 else new_name
             self._file_name_var.set(display)
             self._drop_label.config(text=display, fg=Theme.ACCENT)
 
+            lrc_info = "\n싱크 가사(.lrc) 파일도 생성되었습니다." if lrc_created else ""
             self._status_bar.set_status(
                 f"적용 완료 — {new_name}", "success"
             )
             messagebox.showinfo(
                 "적용 완료",
-                f"메타데이터와 파일명이 변경되었습니다.\n\n"
+                f"메타데이터와 파일명이 변경되었습니다.{lrc_info}\n\n"
                 f"변경 전: {old_path.name}\n"
                 f"변경 후: {new_name}\n\n"
                 f"제목: {track.title}\n"

@@ -18,7 +18,6 @@ from mutagen.id3 import (
     TRCK,  # 트랙번호
     APIC,  # 앨범아트
     USLT,  # 가사 (Unsynchronized Lyrics)
-    SYLT,  # 싱크 가사 (Synchronized Lyrics)
     TPOS,  # 디스크번호
     TYER,  # 연도
     ID3TimeStamp,
@@ -62,7 +61,6 @@ class MP3Handler:
         track_number: int = 0,
         cover_data: Optional[bytes] = None,
         lyrics: str = "",
-        synced_lyrics: Optional[List[Tuple[str, int]]] = None,
         disc_number: int = 0,
     ) -> None:
         """MP3 파일에 메타데이터를 기록"""
@@ -103,15 +101,25 @@ class MP3Handler:
         if lyrics:
             tags["USLT::kor"] = USLT(encoding=3, lang="kor", desc="", text=lyrics)
 
-        # 싱크 가사 (SYLT - Synchronized Lyrics, 삼성뮤직 호환)
-        if synced_lyrics:
-            tags["SYLT::kor"] = SYLT(
-                encoding=3,
-                lang="kor",
-                format=2,   # 2 = 절대 시간 (밀리초)
-                type=1,     # 1 = lyrics
-                desc="",
-                text=synced_lyrics,
-            )
-
         tags.save(filepath, v2_version=3)
+
+    def write_lrc_file(
+        self,
+        mp3_filepath: str,
+        synced_lyrics: List[Tuple[str, int]],
+    ) -> str:
+        """
+        싱크 가사를 MP3 파일과 동일한 이름의 .lrc 파일로 저장한다.
+        삼성뮤직은 SYLT ID3 태그 대신 사이드카 .lrc 파일을 읽는다.
+
+        반환: 생성된 .lrc 파일 경로
+        """
+        lrc_path = Path(mp3_filepath).with_suffix(".lrc")
+        lines = []
+        for text, ms in synced_lyrics:
+            mm = ms // 60000
+            ss = (ms % 60000) // 1000
+            cs = (ms % 1000) // 10
+            lines.append(f"[{mm:02d}:{ss:02d}.{cs:02d}]{text}")
+        lrc_path.write_text("\n".join(lines), encoding="utf-8")
+        return str(lrc_path)
