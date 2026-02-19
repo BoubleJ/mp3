@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip3:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(cmd.exe /c 'echo %USERNAME%')",
+      "Bash(cmd.exe /c 'echo %APPDATA%')",
+      "Bash(xargs:*)",
+      "Bash(wsl.exe bash -c \"python3 --version 2>&1; which python3 2>&1; echo DISPLAY=$DISPLAY\")",
+      "Bash(wsl.exe --list --verbose:*)"
+    ]
+  }
+}
