@@ -291,6 +291,9 @@ class MelonCrawler:
                 for br in el.find_all("br"):
                     br.replace_with("\n")
                 text = el.get_text().strip()
+                # 가사 준비중 안내 문구는 가사 없음으로 처리
+                if "가사 준비중" in text:
+                    return ""
                 # 의미 있는 텍스트가 있을 때만 반환
                 if len(text) > 10:
                     return text

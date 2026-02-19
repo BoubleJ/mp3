@@ -1652,6 +1652,10 @@ class SingleFileTab(ttk.Frame):
         self.after(0, self._on_lyrics_done, detail["lyrics"], synced, detail["genre"])
 
     def _on_lyrics_done(self, lyrics: str, synced: list, genre: str):
+        # 멜론 가사가 없고 LRCLIB 싱크 가사가 있으면 LRC에서 plain 텍스트 추출
+        if not lyrics and synced:
+            lyrics = "\n".join(text for text, _ in synced if text.strip())
+
         self._lyrics = lyrics
         self._synced_lyrics = synced
 
