@@ -195,23 +195,40 @@ class MelonCrawler:
 
         return tracks
 
-    # ── 가사 크롤링 ───────────────────────────────────────────────────────────
+    # ── 곡 상세 크롤링 (가사 + 장르) ─────────────────────────────────────────
 
-    def crawl_lyrics(self, song_id: str) -> str:
+    def crawl_song_detail(self, song_id: str) -> dict:
         """
         곡 상세 페이지(https://www.melon.com/song/detail.htm?songId=...)에서
-        가사를 추출해 반환한다. 가사가 없거나 실패 시 빈 문자열 반환.
+        가사와 장르를 함께 추출한다.
+        반환: {"lyrics": str, "genre": str}
         """
+        result = {"lyrics": "", "genre": ""}
         if not song_id:
-            return ""
+            return result
         url = f"https://www.melon.com/song/detail.htm?songId={song_id}"
         try:
             resp = requests.get(url, headers=self.HEADERS, timeout=15)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
-            return self._extract_lyrics(soup)
+            result["lyrics"] = self._extract_lyrics(soup)
+            result["genre"] = self._extract_song_genre(soup)
         except Exception:
-            return ""
+            pass
+        return result
+
+    def crawl_lyrics(self, song_id: str) -> str:
+        """crawl_song_detail의 가사 전용 래퍼 (하위 호환)"""
+        return self.crawl_song_detail(song_id)["lyrics"]
+
+    def _extract_song_genre(self, soup: BeautifulSoup) -> str:
+        """곡 상세 페이지의 dl.list에서 장르를 추출한다."""
+        dl = soup.select_one("dl.list")
+        if dl:
+            for dt, dd in zip(dl.find_all("dt"), dl.find_all("dd")):
+                if "장르" in dt.get_text(strip=True):
+                    return dd.get_text(strip=True)
+        return ""
 
     # ── 싱크 가사 (LRCLIB) ───────────────────────────────────────────────────
 

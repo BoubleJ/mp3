@@ -1647,13 +1647,18 @@ class SingleFileTab(ttk.Frame):
     # ── 가사 로딩 ────────────────────────────
     def _fetch_lyrics_worker(self, song_id: str, title: str, artist: str, album: str):
         crawler = MelonCrawler()
-        lyrics = crawler.crawl_lyrics(song_id)
+        detail = crawler.crawl_song_detail(song_id)
         synced = crawler.fetch_synced_lyrics(title, artist, album)
-        self.after(0, self._on_lyrics_done, lyrics, synced)
+        self.after(0, self._on_lyrics_done, detail["lyrics"], synced, detail["genre"])
 
-    def _on_lyrics_done(self, lyrics: str, synced: list):
+    def _on_lyrics_done(self, lyrics: str, synced: list, genre: str):
         self._lyrics = lyrics
         self._synced_lyrics = synced
+
+        # 곡 상세 페이지에서 가져온 장르로 미리보기 갱신
+        if genre:
+            self._meta_vars["genre"].set(genre)
+
         self._lyrics_text.configure(state="normal")
         self._lyrics_text.delete("1.0", "end")
         if lyrics:
